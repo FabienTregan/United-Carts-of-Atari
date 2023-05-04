@@ -756,6 +756,8 @@ void set_tv_mode(int tv_mode) {
 // spurious reads until it has started the cartridge in 2600 mode.
 bool comms_enabled = false;
 
+unsigned long blink_counter;
+
 int emulate_firmware_cartridge() {
 	__disable_irq();	// Disable interrupts
 	uint16_t addr, addr_prev = 0;
@@ -763,8 +765,10 @@ int emulate_firmware_cartridge() {
 	unsigned const char *bankPtr = &firmware_rom[0];
 
 	while (true) {
-		while ((addr = ADDR_IN) != addr_prev)
+		while ((addr = ADDR_IN) != addr_prev) {
+			blink();
 			addr_prev = addr;
+		}
 
 		// got a stable address
 		if (addr & 0x1000) { // A12 high
@@ -822,7 +826,9 @@ int emulate_firmware_cartridge() {
 			}
 
 			SET_DATA_MODE_OUT
-			while (ADDR_IN == addr);
+			while (ADDR_IN == addr) {
+				blink();
+			}
 			SET_DATA_MODE_IN
 		}
 	}
@@ -835,4 +841,12 @@ bool reboot_into_cartridge() {
 	set_menu_status_byte(STATUS_StatusByteReboot, 1);
 
 	return emulate_firmware_cartridge() == CART_CMD_START_CART;
+}
+
+void blink() {
+	blink_counter++;
+	if(blink_counter > 100000) {
+		blink_counter = 0;
+		HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_0);
+	}
 }
